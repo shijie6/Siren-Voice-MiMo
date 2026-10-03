@@ -11,6 +11,36 @@ import {
   getAmbienceRecord,
   saveAmbienceRecord,
 } from "./db.js";
+import { getMimoCacheKeyForSpeak } from "./mimo_logic.js";
+
+/**
+ * 🌟 [MiMo] 场景链路统一查库入口（按钮状态扫描与播放前回读共用）：
+ * 仅当 provider 为 MiMo 时，用共用 helper 计算与 tts_logic.js 完全相同的 cacheKey，
+ * 传入既有 findExactTtsRecord()；其他 Provider 传 null，保持原有匹配语义。
+ * MiMo 身份解析失败（缺映射 / Clone 资产缺失）时直接视为未命中，
+ * 不回退旧的文本匹配，避免旧缓存误报 ready。
+ */
+async function findTtsRecordWithProviderIdentity(chatId, floorId, speakObj) {
+  const settings = getSirenSettings();
+  const provider = settings?.tts?.provider || "indextts";
+  let cacheKey = null;
+  if (provider === "mimo") {
+    cacheKey = await getMimoCacheKeyForSpeak(
+      speakObj,
+      settings?.tts?.mimo || {},
+    );
+    if (!cacheKey) return null;
+  }
+  return findExactTtsRecord(
+    chatId,
+    floorId,
+    speakObj.char,
+    speakObj.text,
+    speakObj.mood,
+    speakObj.detail,
+    cacheKey,
+  );
+}
 import {
   initAudioEngine,
   routeAudioToMixer,
@@ -554,17 +584,13 @@ export async function injectScenePlayButtons() {
         finalState = "ready";
         showRegen = true;
       } else if (chatId) {
-        // 查库逻辑保持不变...
-        const { findExactTtsRecord } = await import("./db.js");
+        // 查库逻辑保持不变...（MiMo 走共用缓存身份，见 findTtsRecordWithProviderIdentity）
         const checks = await Promise.all(
           ttsNodes.map(async (node) => {
-            const record = await findExactTtsRecord(
+            const record = await findTtsRecordWithProviderIdentity(
               chatId,
               floorId,
-              node.speakObj.char,
-              node.speakObj.text,
-              node.speakObj.mood, // 👈 新增
-              node.speakObj.detail, // 👈 新增
+              node.speakObj,
             );
             return !!(record && record.audioBlob);
           }),
@@ -677,13 +703,10 @@ export async function scanAndRefreshAllScenes() {
       // 查库：并发检查这一层楼的所有语音
       const checks = await Promise.all(
         ttsNodes.map(async (node) => {
-          const record = await findExactTtsRecord(
+          const record = await findTtsRecordWithProviderIdentity(
             chatId,
             floorId,
-            node.speakObj.char,
-            node.speakObj.text,
-            node.speakObj.mood, // 👈 补齐参数
-            node.speakObj.detail, // 👈 补齐参数
+            node.speakObj,
           );
           return !!(record && record.audioBlob);
         }),
@@ -746,17 +769,12 @@ async function refreshSceneButtonStatus(playBtn, regenBtn, floorId, chatId) {
 
   // 2. 批量检查数据库中是否存在对应的 Blob
   try {
-    const { findExactTtsRecord } = await import("./db.js");
-
     const checks = await Promise.all(
       ttsNodes.map(async (node) => {
-        const record = await findExactTtsRecord(
+        const record = await findTtsRecordWithProviderIdentity(
           chatId,
           floorId,
-          node.speakObj.char,
-          node.speakObj.text,
-          node.speakObj.mood, // 👈 补齐参数
-          node.speakObj.detail, // 👈 补齐参数
+          node.speakObj,
         );
         return !!(record && record.audioBlob);
       }),
@@ -876,19 +894,16 @@ async function handleSceneButtonClick(btn, mesNode, forceRegen = false) {
     btn.innerHTML = `<i class="fa-solid fa-pause" style="color: #3b82f6;"></i>`;
 
     const latestTimeline = parseMessageTimeline(floorId);
-    const { findExactTtsRecord } = await import("./db.js");
     const chatId = SillyTavern.getContext().chatId;
 
     // 🌟 核心改进：无论内存里有没有，播放前统一去数据库捞一遍最新的
+    // （MiMo 走共用缓存身份，见 findTtsRecordWithProviderIdentity）
     for (const node of latestTimeline) {
       if (node.type === "tts") {
-        const record = await findExactTtsRecord(
+        const record = await findTtsRecordWithProviderIdentity(
           chatId,
           floorId,
-          node.speakObj.char,
-          node.speakObj.text,
-          node.speakObj.mood, // 👈 补齐参数
-          node.speakObj.detail, // 👈 补齐参数
+          node.speakObj,
         );
         node.blob = record?.audioBlob || null;
 

@@ -229,6 +229,12 @@ export function getTtsVoiceAndMoodLists(provider) {
       voices = (gptData.characters || []).map((c) => c.charName);
       moods = (gptData.emotions || []).map((e) => e.emotion);
       break;
+
+    case "mimo":
+      // 音色：位于角色卡 siren_voice_tts_mimo；MiMo 支持自由自然语言 mood，无固定情绪词表
+      const mimoVoiceMap = charExts.siren_voice_tts_mimo?.voices || {};
+      voices = Object.keys(mimoVoiceMap);
+      break;
   }
 
   return { voices, moods };
@@ -277,6 +283,7 @@ export async function syncTtsWorldbookEntries(selectedProvider, isTtsEnabled) {
     minimax: "minimax",
     elevenlabs: "ElevenLabs",
     voxcpm: "VoxCPM", // <--- 🌟 新增这一行：将 voxcpm 映射到世界书条目 TTS-VoxCPM
+    mimo: "MiMo", // <--- 🌟 [MiMo] 映射到世界书条目 TTS-MiMo
   };
   const targetEntryName = isTtsEnabled
     ? `TTS-${providerToEntrySuffix[selectedProvider]}`

@@ -5,6 +5,15 @@ import { generateDoubaoProductionAudioBlob } from "./doubao_logic.js";
 import { generateGptSovitsAudio } from "./gptsovits_logic.js";
 import { generateVoxCpmAudioBlob } from "./voxcpm_logic.js";
 import {
+  getMimoCharacterConfig,
+  getMimoCacheKeyForSpeak,
+  buildMimoStylePrompt,
+  buildMimoCacheKey,
+  generateMimoAudioBlob,
+  MIMO_MODEL_TTS,
+  MIMO_MODEL_VOICECLONE,
+} from "./mimo_logic.js";
+import {
   parseSpeakTags,
   stripParentheticalAsides,
   checkReplyIntegrity,
@@ -269,16 +278,38 @@ export async function fetchTtsBlobProvider(
 
     // 1. 查找缓存时，必须使用带有语气词和Markdown的原始 speakObj.text，保证 Cache Hit
     if (!forceRegen && currentChatId) {
-      const cachedRecord = await findExactTtsRecord(
-        currentChatId,
-        floor,
-        speakObj.char,
-        speakObj.text,
-        speakObj.mood || "",
-        speakObj.detail || "",
-      );
-      if (cachedRecord && cachedRecord.audioBlob) {
-        return cachedRecord.audioBlob;
+      if (provider === "mimo") {
+        // 🌟 [MiMo] 缓存身份必须区分 Provider/模型/音色/Clone revision/stylePrompt，
+        // 不能走旧的 char/text/mood/detail 文本匹配（会串音）。
+        // 身份解析失败（缺映射/缺 Clone 资产）时 key 为 null，视为未命中，
+        // 转入生成路径给出明确的用户提示。
+        const mimoKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
+        if (mimoKey) {
+          const cachedRecord = await findExactTtsRecord(
+            currentChatId,
+            floor,
+            speakObj.char,
+            speakObj.text,
+            speakObj.mood || "",
+            speakObj.detail || "",
+            mimoKey,
+          );
+          if (cachedRecord && cachedRecord.audioBlob) {
+            return cachedRecord.audioBlob;
+          }
+        }
+      } else {
+        const cachedRecord = await findExactTtsRecord(
+          currentChatId,
+          floor,
+          speakObj.char,
+          speakObj.text,
+          speakObj.mood || "",
+          speakObj.detail || "",
+        );
+        if (cachedRecord && cachedRecord.audioBlob) {
+          return cachedRecord.audioBlob;
+        }
       }
     }
 
@@ -312,6 +343,7 @@ export async function fetchTtsBlobProvider(
     }
 
     let blob = null;
+    let mimoCacheKey = null; // 🌟 [MiMo] 缓存身份，写入历史时必须与查询使用同一个 key
     switch (provider) {
       case "indextts":
         // ✅ 此时传入的 apiPayloadText：无 Markdown，无 语气词
@@ -388,6 +420,58 @@ export async function fetchTtsBlobProvider(
         );
         break;
 
+      case "mimo": {
+        // 🌟 [MiMo] 请求正文使用 speakObj.text 派生后的 apiPayloadText：
+        // 保留 () / [] 音频标签，仅做最小 Markdown 清理，不得调用 stripParentheticalAsides()。
+        let resolvedVoice = null;
+        try {
+          resolvedVoice = await getMimoCharacterConfig(
+            speakObj.char,
+            ttsSettings,
+          );
+        } catch (err) {
+          if (window.toastr)
+            window.toastr.warning(err?.message || "MiMo 音色解析失败");
+          return null;
+        }
+        if (!resolvedVoice) {
+          if (window.toastr)
+            window.toastr.warning(`未配置“${speakObj.char}”的 MiMo 音色。`);
+          return null;
+        }
+
+        const mimoModel =
+          resolvedVoice.type === "clone"
+            ? MIMO_MODEL_VOICECLONE
+            : MIMO_MODEL_TTS;
+        const mimoStylePrompt = buildMimoStylePrompt(
+          speakObj,
+          resolvedVoice,
+          ttsSettings?.default_narrator_style_prompt,
+        );
+        mimoCacheKey = await buildMimoCacheKey({
+          speakObj,
+          resolvedVoice,
+          model: mimoModel,
+          stylePrompt: mimoStylePrompt,
+          apiPayloadText,
+        });
+
+        try {
+          blob = await generateMimoAudioBlob(
+            { ...speakObj, text: apiPayloadText },
+            resolvedVoice,
+            ttsSettings,
+          );
+        } catch (err) {
+          console.error(`[Siren Voice][MiMo] 合成失败:`, err);
+          if (window.toastr)
+            window.toastr.warning(err?.message || "MiMo 合成失败");
+          return null;
+        }
+        break;
+      }
+
       default:
         console.warn(`[Siren Voice][预加载] 暂不支持该引擎: ${provider}`);
         return null;
@@ -404,6 +488,8 @@ export async function fetchTtsBlobProvider(
         floor,
         chatId: currentChatId,
         audioBlob: blob,
+        // 🌟 [MiMo] 缓存身份随记录落库，供 events/ambience 用同一个 key 回读
+        ...(mimoCacheKey ? { cacheKey: mimoCacheKey } : {}),
       });
       console.log(
         `[Siren Voice][预加载] 💾 成功生成音频并写入缓存库，可供语音条复用 (Floor: ${floor})`,
@@ -453,7 +539,9 @@ export async function preloadTtsForTimeline(
 
       case "minimax":
       case "elevenlabs":
+      case "mimo":
         // 🌟 内存优化：串行生成，逐条请求并立即释放，避免多段大体积音频同时驻留内存触发手机 OOM。
+        // [MiMo] 进入场景时间轴时继续复用本函数与现有串行生成策略，不另建预加载器。
         for (let i = 0; i < timeline.length; i++) {
           const node = timeline[i];
           if (node.type === "tts") {

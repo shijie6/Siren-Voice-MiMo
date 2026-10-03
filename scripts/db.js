@@ -3,8 +3,9 @@ import { getSirenSettings } from "./settings.js";
 
 const DB_NAME = "SirenVoiceDB";
 const STORE_NAME = "TTS_History";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const AMBIENCE_STORE_NAME = "AMBIENCE_Cache"; // 👈 [新增] Ambience 专属存储库名
+const MIMO_CLONE_STORE_NAME = "MIMO_Clone_Assets"; // 👈 [新增] MiMo VoiceClone 本机参考音频资产
 
 /** @type {Map<string, Object[]>} cache of getTtsHistory results keyed by chatId */
 const ttsHistoryCache = new Map();
@@ -109,6 +110,12 @@ function openDB() {
         });
       }
 
+      // 👇 [新增] 创建 MiMo VoiceClone 资产库，keyPath 为 id。
+      // 只在 Store 不存在时创建；不删除已有 Store，不清空旧语音历史。
+      if (!db.objectStoreNames.contains(MIMO_CLONE_STORE_NAME)) {
+        db.createObjectStore(MIMO_CLONE_STORE_NAME, { keyPath: "id" });
+      }
+
       const ttsStore = event.target.transaction.objectStore(STORE_NAME);
       if (ttsStore && !ttsStore.indexNames.contains("chatId")) {
         ttsStore.createIndex("chatId", "chatId", { unique: false });
@@ -123,6 +130,8 @@ function openDB() {
 /**
  * 添加一条 TTS 记录到数据库
  * @param {Object} record - 包含 provider, char, text, floor, audioBlob, chatId 的对象
+ *   MiMo 记录可通过 record.cacheKey 携带缓存身份（由 mimo_logic.js 的 buildMimoCacheKey 生成，
+ *   写入与查询必须使用同一个 key，见 findExactTtsRecord 的 cacheKey 参数）。
  */
 export async function addTtsRecord(record) {
   try {
@@ -393,6 +402,9 @@ export async function clearTtsHistory() {
  * @param {string} text - 语音文本
  * @param {string} mood - 情绪 (新增)
  * @param {string} detail - 情绪细节 (新增)
+ * @param {string|null} cacheKey - [MiMo] 可选的缓存身份。
+ *   只有调用方明确传入 MiMo cacheKey 时，才要求记录中的 provider/cacheKey 完全相同
+ *   （叠加原有的 floor/chatId 匹配）；不带该参数的旧调用保持原有字段匹配语义。
  */
 export async function findExactTtsRecord(
   chatId,
@@ -401,16 +413,20 @@ export async function findExactTtsRecord(
   text,
   mood = "",
   detail = "",
+  cacheKey = null,
 ) {
   try {
     const history = await getTtsHistory(chatId);
     const match = history.find(
       (r) =>
         String(r.floor) === String(floor) &&
-        r.char === char &&
-        r.text === text &&
-        (r.mood || "") === mood &&
-        (r.detail || "") === detail,
+        (cacheKey
+          ? // 🌟 [MiMo] 严格身份匹配：Provider + CacheKey（内含 model/voiceKey/Clone revision/文本/stylePrompt）
+            r.provider === "mimo" && r.cacheKey === cacheKey
+          : r.char === char &&
+            r.text === text &&
+            (r.mood || "") === mood &&
+            (r.detail || "") === detail),
     );
 
     if (match) {
@@ -516,4 +532,78 @@ async function enforceAmbienceLimit(db, maxLimit) {
     };
     request.onerror = (e) => reject(e.target.error);
   });
+}
+
+/**
+ * 👇 [新增] MiMo VoiceClone 资产 CRUD（本机 IndexedDB 专用，与 TTS 历史数据职责分离）
+ * 资产结构: { id, name, mimeType, dataUrl, byteLength, createdAt, updatedAt, revision }
+ */
+
+/** 保存（新增或整体替换）一条 Clone 资产 */
+export async function saveMimoCloneAsset(asset) {
+  if (!asset || !asset.id) {
+    throw new Error("MiMo Clone 资产缺少 id，无法保存");
+  }
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction(MIMO_CLONE_STORE_NAME, "readwrite");
+    const request = transaction.objectStore(MIMO_CLONE_STORE_NAME).put(asset);
+    request.onsuccess = () => resolve();
+    request.onerror = (e) => reject(e.target.error);
+  });
+  return asset;
+}
+
+/** 按 id 读取一条 Clone 资产，不存在时返回 null */
+export async function getMimoCloneAsset(id) {
+  if (!id) return null;
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction(MIMO_CLONE_STORE_NAME, "readonly");
+      const request = transaction.objectStore(MIMO_CLONE_STORE_NAME).get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.error("[Siren Voice] 💾 读取 MiMo Clone 资产失败:", err);
+    return null;
+  }
+}
+
+/** 列出全部 Clone 资产（按更新时间倒序） */
+export async function listMimoCloneAssets() {
+  try {
+    const db = await openDB();
+    const records = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(MIMO_CLONE_STORE_NAME, "readonly");
+      const request = transaction.objectStore(MIMO_CLONE_STORE_NAME).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = (e) => reject(e.target.error);
+    });
+    return records.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  } catch (err) {
+    console.error("[Siren Voice] 💾 列出 MiMo Clone 资产失败:", err);
+    return [];
+  }
+}
+
+/** 删除一条 Clone 资产，返回是否删除成功 */
+export async function deleteMimoCloneAsset(id) {
+  if (!id) return false;
+  try {
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(MIMO_CLONE_STORE_NAME, "readwrite");
+      const request = transaction
+        .objectStore(MIMO_CLONE_STORE_NAME)
+        .delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = (e) => reject(e.target.error);
+    });
+    return true;
+  } catch (err) {
+    console.error("[Siren Voice] 💾 删除 MiMo Clone 资产失败:", err);
+    return false;
+  }
 }

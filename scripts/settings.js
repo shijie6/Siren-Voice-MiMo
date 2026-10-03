@@ -841,6 +841,14 @@ export const defaultSettings = Object.freeze({
       repetition_penalty: 1.35,
       seed: -1,
     },
+    mimo: {
+      api_base: "https://api.xiaomimimo.com/v1",
+      api_key: "",
+      format: "wav",
+      default_narrator_voice_id: "冰糖",
+      default_narrator_style_prompt: "温柔、自然、清晰，像有声小说旁白。",
+      request_timeout_ms: 60000,
+    },
     voxcpm: {
       api_base: "http://127.0.0.1:8000",
       api_key: "",

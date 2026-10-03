@@ -4,6 +4,7 @@ import { getElevenLabsHtml, bindElevenLabsEvents } from "./elevenlabs.js";
 import { getDoubaoHtml, bindDoubaoEvents } from "./doubao.js";
 import { getGptSovitsHtml, bindGptSovitsEvents } from "./gpt-sovits.js";
 import { getVoxCpmHtml, bindVoxCpmEvents } from "./voxcpm.js";
+import { getMimoHtml, bindMimoEvents } from "./mimo.js";
 import { getSirenSettings, saveSirenSettings } from "./settings.js";
 import { compileSirenCss, syncTtsWorldbookEntries } from "./utils.js";
 import {
@@ -173,6 +174,7 @@ export function initTtsSettings() {
                         <option value="doubao">豆包（火山引擎）</option>
                         <option value="minimax">MiniMax</option>
                         <option value="elevenlabs">ElevenLabs</option>
+                        <option value="mimo">MiMo V2.5 TTS</option>
                     </select>
                 </div>
 
@@ -615,6 +617,8 @@ function bindTtsGlobalUiEvents() {
           $("#siren-gsv-save-btn").trigger("click", [true]);
         } else if (currentProvider === "voxcpm") {
           $("#siren-vox-global-save").trigger("click", [true]);
+        } else if (currentProvider === "mimo") {
+          $("#siren-mimo-save-all").trigger("click", [true]);
         }
         await updateTtsGlobalMacros(currentProvider);
 
@@ -659,6 +663,9 @@ function renderProviderSettings() {
   } else if (provider === "voxcpm") {
     container.html(getVoxCpmHtml());
     bindVoxCpmEvents();
+  } else if (provider === "mimo") {
+    container.html(getMimoHtml());
+    bindMimoEvents();
   } else {
     container.html(
       `<div style="text-align:center; padding: 20px; color:#64748b;">${provider} 设置界面构建中... 🚧</div>`,
@@ -719,6 +726,11 @@ export async function updateTtsGlobalMacros(provider) {
         .join(", ");
     } else if (provider === "voxcpm") {
       const voices = charExt.siren_voice_tts_voxcpm?.voices || {};
+      currentVoice = Object.keys(voices).join(", ");
+      currentMood = "";
+    } else if (provider === "mimo") {
+      // MiMo 支持自由自然语言的 mood/detail，currentMood 可以为空
+      const voices = charExt.siren_voice_tts_mimo?.voices || {};
       currentVoice = Object.keys(voices).join(", ");
       currentMood = "";
     }
