@@ -1,0 +1,5 @@
+# opencode tooling (not part of the plugin)
+.opencode/
+.agents/
+skills-lock.json
+node_modules/
