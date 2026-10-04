@@ -38,6 +38,8 @@ const MIMO_CLONE_MIME_NORMALIZE = {
   "audio/mp3": "audio/mpeg",
   "audio/wav": "audio/wav",
   "audio/x-wav": "audio/wav",
+  "audio/wave": "audio/wav",
+  "audio/vnd.wave": "audio/wav",
 };
 
 /** 官方限制：编码后的 Base64 Data URL 总长度不能超过 10 MB */
@@ -246,16 +248,15 @@ function arrayBufferToBase64(buffer) {
 }
 
 function normalizeMimoCloneMime(file) {
+  // 🌟 安卓 WebView/SillyDroid 的文件选择器常把 WAV 报告成 audio/x-wav、
+  // audio/vnd.wave 等变体，甚至留空 MIME，因此优先信任扩展名，其次再按 MIME 匹配。
+  const name = String(file?.name || "").toLowerCase();
+  if (name.endsWith(".wav")) return "audio/wav";
+  if (name.endsWith(".mp3")) return "audio/mpeg";
   const mime = String(file?.type || "")
     .toLowerCase()
     .trim();
   if (MIMO_CLONE_MIME_NORMALIZE[mime]) return MIMO_CLONE_MIME_NORMALIZE[mime];
-  // 部分环境 file.type 为空，按扩展名兜底
-  if (!mime) {
-    const name = String(file?.name || "").toLowerCase();
-    if (name.endsWith(".mp3")) return "audio/mpeg";
-    if (name.endsWith(".wav")) return "audio/wav";
-  }
   return null;
 }
 

@@ -107,7 +107,7 @@ export function getMimoHtml() {
                     <label style="color:#cbd5e1; font-size:0.9em;">新增克隆音色</label>
                     <input type="text" id="siren-mimo-clone-name" class="siren-ext-input" placeholder="克隆音色名称（如：我的女声）">
                     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                        <input type="file" id="siren-mimo-clone-file" accept=".mp3,.wav,audio/mpeg,audio/wav" style="display: none;">
+                        <input type="file" id="siren-mimo-clone-file" accept="audio/*" style="display: none;">
                         <button id="siren-mimo-clone-choose" class="siren-ext-btn siren-ext-btn-secondary" style="flex: 1; min-width: 110px;"><i class="fa-solid fa-folder-open"></i> 选择 MP3/WAV</button>
                         <button id="siren-mimo-clone-save" class="siren-ext-btn siren-ext-btn-primary" style="flex: 1; min-width: 110px; background: #f59e0b; border-color: #d97706; color: #fff;"><i class="fa-solid fa-floppy-disk"></i> 保存</button>
                     </div>
@@ -142,7 +142,7 @@ export function getMimoHtml() {
             </button>
         </div>
 
-        <input type="file" id="siren-mimo-clone-replace-file" accept=".mp3,.wav,audio/mpeg,audio/wav" style="display: none;">
+        <input type="file" id="siren-mimo-clone-replace-file" accept="audio/*" style="display: none;">
     </div>
     `;
 }
