@@ -1,6 +1,6 @@
 // scripts/fish.js
 // Fish Audio Provider 设置界面：API Key、角色音色映射（reference_id）、
-// 音色模型库（我的模型同步 / 公开库搜索）、克隆上传（POST /model）和发音测试。
+// 音色库（我的音色同步 / 公开库搜索）、克隆上传（POST /model）和发音测试。
 // 🌟 Fish 无旁白兜底、无 style prompt、无本机 Clone 资产（音色为服务端持久 reference_id）。
 import {
   getSirenSettings,
@@ -14,7 +14,7 @@ import {
 } from "./fish_logic.js";
 import { syncTtsWorldbookEntries } from "./utils.js";
 
-// 模块级模型库缓存：同步我的模型后供 datalist 与行内回填使用
+// 模块级音色库缓存：同步我的音色后供 datalist 与行内回填使用
 let fishMyModels = [];
 // 测试区当前试听的 Object URL（替换或销毁前必须 revoke）
 let fishTestObjectUrl = null;
@@ -75,7 +75,7 @@ export function getFishHtml() {
         <h4 style="color: #a78bfa; font-size: 1.1em; margin-bottom: 10px; margin-top: 20px; border-bottom: 1px solid rgba(168, 85, 247, 0.3); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
             <span><i class="fa-solid fa-users-viewfinder" style="margin-right: 5px;"></i> 角色音色映射</span>
             <button id="siren-fish-fetch-my-models" class="siren-ext-btn siren-ext-btn-primary" style="padding: 4px 10px; font-size: 0.9em; background: #f59e0b; border-color: #d97706; color: #ffffff; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);">
-                <i class="fa-solid fa-cloud-arrow-down"></i> 同步我的模型
+                <i class="fa-solid fa-cloud-arrow-down"></i> 同步我的音色
             </button>
         </h4>
         <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; border: 1px solid #334155;">
@@ -87,7 +87,7 @@ export function getFishHtml() {
                 </button>
             </div>
             <small style="display:block; color:#64748b; font-size: 0.8em; margin-top: 8px; text-align: center;">
-                reference_id 可手填（官方音色页复制）或双击从「我的模型」中选择。未映射的角色不会被配音。
+                reference_id 可手填（官方音色页复制）或双击从「我的音色」中选择。未映射的角色不会被配音。
             </small>
         </div>
 
@@ -124,7 +124,7 @@ export function getFishHtml() {
 
         <h4 style="color: #10b981; margin-bottom: 10px; font-size: 1.1em; margin-top: 25px;"><i class="fa-solid fa-vial" style="margin-right: 5px;"></i> Fish Audio 发音测试</h4>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-            <input type="text" id="siren-fish-test-ref" class="siren-ext-input" list="siren-fish-model-datalist" placeholder="reference_id（手填或双击选择我的模型）">
+            <input type="text" id="siren-fish-test-ref" class="siren-ext-input" list="siren-fish-model-datalist" placeholder="reference_id（手填或双击选择我的音色）">
             <textarea id="siren-fish-test-text" class="siren-ext-textarea" rows="2" placeholder="输入一句台词测试效果。"></textarea>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
@@ -356,7 +356,7 @@ export function bindFishEvents() {
       bindFishRowEvents();
     });
 
-  // 4. 同步我的模型
+  // 4. 同步我的音色
   $("#siren-fish-fetch-my-models")
     .off("click")
     .on("click", async function () {
@@ -377,7 +377,7 @@ export function bindFishEvents() {
           $("#siren-fish-apibase").val().trim(),
         );
         if (window.toastr)
-          window.toastr.success(`已同步 ${count} 个我的音色模型！`);
+          window.toastr.success(`已同步 ${count} 个我的音色！`);
       } catch (err) {
         console.error("[Siren Voice][Fish] 同步模型失败:", err);
         if (window.toastr) window.toastr.error(err?.message || "同步失败");
@@ -482,7 +482,7 @@ export function bindFishEvents() {
 
         if (window.toastr)
           window.toastr.success(
-            `克隆音色创建成功！reference_id: ${id} 已同步到「我的模型」`,
+            `克隆音色创建成功！reference_id: ${id} 已同步到「我的音色」`,
           );
 
         // 上传成功后自动刷新模型列表，新音色立即可在 datalist 中选择

@@ -136,7 +136,13 @@ export async function fetchFishModels({
 
   const url = `${getFishApiBase(apiBase)}/model?${params.toString()}`;
 
-  const response = await fetch(url, {
+  // 🌟 SillyTavern 官方 /proxy CORS 代理转发时不回拼 query（req.params.url 只含
+  // 路径部分，实测 self/title/page_size 会全部丢失）。当 base 指向 /proxy/ 时，
+  // 把目标 query 的 ? 编码为 %3F，使整条 URL 进入代理路径，由 Express 解码还原；
+  // 直连或自建透传代理不受影响，保持字面 ?。
+  const requestUrl = url.includes("/proxy/") ? url.replace("?", "%3F") : url;
+
+  const response = await fetch(requestUrl, {
     method: "GET",
     headers: fishAuthHeaders(apiKey),
   });
