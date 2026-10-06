@@ -17,6 +17,7 @@ import {
   dispatchTtsGeneration,
 } from "./tts_logic.js";
 import { getMimoCacheKeyForSpeak } from "./mimo_logic.js";
+import { getFishCacheKeyForSpeak } from "./fish_logic.js";
 import { findExactTtsRecord, clearTtsCache } from "./db.js";
 import {
   injectScenePlayButtons,
@@ -1468,12 +1469,14 @@ async function handleInlineSpeakPlay(speakObj, cardElement, action = "play") {
 
   try {
     if (action === "play") {
-      // 🌟 [MiMo] 单条播放路径与 tts_logic 生成链路共用同一个缓存身份 helper：
-      // 只有 Provider 为 MiMo 时才计算 cacheKey（key 为 null 表示身份解析失败，按未命中处理）；
+      // 🌟 [MiMo/Fish] 单条播放路径与 tts_logic 生成链路共用同一个缓存身份 helper：
+      // 只有带缓存身份的 Provider（MiMo/Fish）才计算 cacheKey（key 为 null 表示身份解析失败，按未命中处理）；
       // 其他 Provider 传入 null，继续沿用原有的 char/text/mood/detail 匹配语义。
-      let mimoCacheKey = null;
+      let providerCacheKey = null;
       if (provider === "mimo") {
-        mimoCacheKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
+        providerCacheKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
+      } else if (provider === "fish") {
+        providerCacheKey = await getFishCacheKeyForSpeak(speakObj);
       }
       const cachedRecord = await findExactTtsRecord(
         currentChatId,
@@ -1482,7 +1485,7 @@ async function handleInlineSpeakPlay(speakObj, cardElement, action = "play") {
         speakObj.text,
         speakObj.mood, // 👈 新增情绪参数
         speakObj.detail, // 👈 新增情绪细节参数
-        mimoCacheKey,
+        providerCacheKey,
       );
       if (cachedRecord && cachedRecord.audioBlob) {
         console.log(`[Siren Voice] 命中本地缓存，直接播放: ${speakObj.text}`);

@@ -849,6 +849,11 @@ export const defaultSettings = Object.freeze({
       default_narrator_style_prompt: "温柔、自然、清晰，像有声小说旁白。",
       request_timeout_ms: 60000,
     },
+    fish: {
+      api_base: "",
+      api_key: "",
+      request_timeout_ms: 60000,
+    },
     voxcpm: {
       api_base: "http://127.0.0.1:8000",
       api_key: "",

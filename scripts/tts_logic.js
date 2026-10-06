@@ -14,6 +14,13 @@ import {
   MIMO_MODEL_VOICECLONE,
 } from "./mimo_logic.js";
 import {
+  getFishCharacterConfig,
+  getFishCacheKeyForSpeak,
+  buildFishApiPayloadText,
+  buildFishCacheKey,
+  generateFishAudioBlob,
+} from "./fish_logic.js";
+import {
   parseSpeakTags,
   stripParentheticalAsides,
   checkReplyIntegrity,
@@ -278,13 +285,18 @@ export async function fetchTtsBlobProvider(
 
     // 1. 查找缓存时，必须使用带有语气词和Markdown的原始 speakObj.text，保证 Cache Hit
     if (!forceRegen && currentChatId) {
-      if (provider === "mimo") {
-        // 🌟 [MiMo] 缓存身份必须区分 Provider/模型/音色/Clone revision/stylePrompt，
+      if (provider === "mimo" || provider === "fish") {
+        // 🌟 [MiMo/Fish] 缓存身份必须区分 Provider/音色/实际发送文本，
         // 不能走旧的 char/text/mood/detail 文本匹配（会串音）。
-        // 身份解析失败（缺映射/缺 Clone 资产）时 key 为 null，视为未命中，
+        // 身份解析失败（缺映射等）时 key 为 null，视为未命中，
         // 转入生成路径给出明确的用户提示。
-        const mimoKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
-        if (mimoKey) {
+        let providerKey = null;
+        if (provider === "mimo") {
+          providerKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
+        } else {
+          providerKey = await getFishCacheKeyForSpeak(speakObj);
+        }
+        if (providerKey) {
           const cachedRecord = await findExactTtsRecord(
             currentChatId,
             floor,
@@ -292,7 +304,7 @@ export async function fetchTtsBlobProvider(
             speakObj.text,
             speakObj.mood || "",
             speakObj.detail || "",
-            mimoKey,
+            providerKey,
           );
           if (cachedRecord && cachedRecord.audioBlob) {
             return cachedRecord.audioBlob;
@@ -343,7 +355,7 @@ export async function fetchTtsBlobProvider(
     }
 
     let blob = null;
-    let mimoCacheKey = null; // 🌟 [MiMo] 缓存身份，写入历史时必须与查询使用同一个 key
+    let providerCacheKey = null; // 🌟 [MiMo/Fish] 缓存身份，写入历史时必须与查询使用同一个 key
     switch (provider) {
       case "indextts":
         // ✅ 此时传入的 apiPayloadText：无 Markdown，无 语气词
@@ -449,7 +461,7 @@ export async function fetchTtsBlobProvider(
           resolvedVoice,
           ttsSettings?.default_narrator_style_prompt,
         );
-        mimoCacheKey = await buildMimoCacheKey({
+        providerCacheKey = await buildMimoCacheKey({
           speakObj,
           resolvedVoice,
           model: mimoModel,
@@ -472,6 +484,43 @@ export async function fetchTtsBlobProvider(
         break;
       }
 
+      case "fish": {
+        // 🌟 [Fish] 无旁白兜底：未配置一律明确提示。
+        // 正文派生完全自包含（buildFishApiPayloadText 会剥离所有括号标签，
+        // 语义与公共清洗区不同），缓存身份与实际发送文本必须同源。
+        const resolvedFishVoice = await getFishCharacterConfig(speakObj.char);
+        if (!resolvedFishVoice) {
+          if (window.toastr)
+            window.toastr.warning(`未配置“${speakObj.char}”的 Fish 音色。`);
+          return null;
+        }
+        const fishPayloadText = buildFishApiPayloadText(speakObj);
+        if (!fishPayloadText) {
+          console.log(
+            `[Siren Voice][预加载] ⚠️ Fish 文本清洗后为空，跳过。原文本: ${speakObj.text}`,
+          );
+          return null;
+        }
+        providerCacheKey = await buildFishCacheKey({
+          speakObj,
+          resolvedVoice: resolvedFishVoice,
+          apiPayloadText: fishPayloadText,
+        });
+        try {
+          blob = await generateFishAudioBlob(
+            { ...speakObj, text: fishPayloadText },
+            resolvedFishVoice,
+            ttsSettings,
+          );
+        } catch (err) {
+          console.error(`[Siren Voice][Fish] 合成失败:`, err);
+          if (window.toastr)
+            window.toastr.warning(err?.message || "Fish Audio 合成失败");
+          return null;
+        }
+        break;
+      }
+
       default:
         console.warn(`[Siren Voice][预加载] 暂不支持该引擎: ${provider}`);
         return null;
@@ -488,8 +537,8 @@ export async function fetchTtsBlobProvider(
         floor,
         chatId: currentChatId,
         audioBlob: blob,
-        // 🌟 [MiMo] 缓存身份随记录落库，供 events/ambience 用同一个 key 回读
-        ...(mimoCacheKey ? { cacheKey: mimoCacheKey } : {}),
+        // 🌟 [MiMo/Fish] 缓存身份随记录落库，供 events/ambience 用同一个 key 回读
+        ...(providerCacheKey ? { cacheKey: providerCacheKey } : {}),
       });
       console.log(
         `[Siren Voice][预加载] 💾 成功生成音频并写入缓存库，可供语音条复用 (Floor: ${floor})`,
@@ -540,8 +589,9 @@ export async function preloadTtsForTimeline(
       case "minimax":
       case "elevenlabs":
       case "mimo":
+      case "fish":
         // 🌟 内存优化：串行生成，逐条请求并立即释放，避免多段大体积音频同时驻留内存触发手机 OOM。
-        // [MiMo] 进入场景时间轴时继续复用本函数与现有串行生成策略，不另建预加载器。
+        // [MiMo/Fish] 进入场景时间轴时继续复用本函数与现有串行生成策略，不另建预加载器。
         for (let i = 0; i < timeline.length; i++) {
           const node = timeline[i];
           if (node.type === "tts") {

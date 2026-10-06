@@ -12,13 +12,15 @@ import {
   saveAmbienceRecord,
 } from "./db.js";
 import { getMimoCacheKeyForSpeak } from "./mimo_logic.js";
+import { getFishCacheKeyForSpeak } from "./fish_logic.js";
 
 /**
- * 🌟 [MiMo] 场景链路统一查库入口（按钮状态扫描与播放前回读共用）：
- * 仅当 provider 为 MiMo 时，用共用 helper 计算与 tts_logic.js 完全相同的 cacheKey，
- * 传入既有 findExactTtsRecord()；其他 Provider 传 null，保持原有匹配语义。
- * MiMo 身份解析失败（缺映射 / Clone 资产缺失）时直接视为未命中，
- * 不回退旧的文本匹配，避免旧缓存误报 ready。
+ * 🌟 [MiMo/Fish] 场景链路统一查库入口（按钮状态扫描与播放前回读共用）：
+ * 仅当 provider 带缓存身份（MiMo/Fish）时，用共用 helper 计算与 tts_logic.js
+ * 完全相同的 cacheKey，传入既有 findExactTtsRecord()；其他 Provider 传 null，
+ * 保持原有匹配语义。
+ * 身份解析失败（缺映射等）时直接视为未命中，不回退旧的文本匹配，
+ * 避免旧缓存误报 ready。
  */
 async function findTtsRecordWithProviderIdentity(chatId, floorId, speakObj) {
   const settings = getSirenSettings();
@@ -29,6 +31,9 @@ async function findTtsRecordWithProviderIdentity(chatId, floorId, speakObj) {
       speakObj,
       settings?.tts?.mimo || {},
     );
+    if (!cacheKey) return null;
+  } else if (provider === "fish") {
+    cacheKey = await getFishCacheKeyForSpeak(speakObj);
     if (!cacheKey) return null;
   }
   return findExactTtsRecord(

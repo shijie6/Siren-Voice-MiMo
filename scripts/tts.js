@@ -5,6 +5,7 @@ import { getDoubaoHtml, bindDoubaoEvents } from "./doubao.js";
 import { getGptSovitsHtml, bindGptSovitsEvents } from "./gpt-sovits.js";
 import { getVoxCpmHtml, bindVoxCpmEvents } from "./voxcpm.js";
 import { getMimoHtml, bindMimoEvents } from "./mimo.js";
+import { getFishHtml, bindFishEvents } from "./fish.js";
 import { getSirenSettings, saveSirenSettings } from "./settings.js";
 import { compileSirenCss, syncTtsWorldbookEntries } from "./utils.js";
 import {
@@ -175,6 +176,7 @@ export function initTtsSettings() {
                         <option value="minimax">MiniMax</option>
                         <option value="elevenlabs">ElevenLabs</option>
                         <option value="mimo">MiMo V2.5 TTS</option>
+                        <option value="fish">Fish Audio</option>
                     </select>
                 </div>
 
@@ -619,6 +621,8 @@ function bindTtsGlobalUiEvents() {
           $("#siren-vox-global-save").trigger("click", [true]);
         } else if (currentProvider === "mimo") {
           $("#siren-mimo-save-all").trigger("click", [true]);
+        } else if (currentProvider === "fish") {
+          $("#siren-fish-save-all").trigger("click", [true]);
         }
         await updateTtsGlobalMacros(currentProvider);
 
@@ -666,6 +670,9 @@ function renderProviderSettings() {
   } else if (provider === "mimo") {
     container.html(getMimoHtml());
     bindMimoEvents();
+  } else if (provider === "fish") {
+    container.html(getFishHtml());
+    bindFishEvents();
   } else {
     container.html(
       `<div style="text-align:center; padding: 20px; color:#64748b;">${provider} 设置界面构建中... 🚧</div>`,
@@ -731,6 +738,11 @@ export async function updateTtsGlobalMacros(provider) {
     } else if (provider === "mimo") {
       // MiMo 支持自由自然语言的 mood/detail，currentMood 可以为空
       const voices = charExt.siren_voice_tts_mimo?.voices || {};
+      currentVoice = Object.keys(voices).join(", ");
+      currentMood = "";
+    } else if (provider === "fish") {
+      // Fish 无情绪参数，currentMood 为空
+      const voices = charExt.siren_voice_tts_fish?.voices || {};
       currentVoice = Object.keys(voices).join(", ");
       currentMood = "";
     }
@@ -912,7 +924,11 @@ async function renderTtsHistory() {
       const blobUrl = URL.createObjectURL(record.audioBlob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `Siren_${record.provider}_${record.char}_Floor${record.floor}_${record.timestamp}.wav`;
+      // 🌟 后缀按记录的实际 mimeType 推导（MiMo=wav，Fish/MiniMax/ElevenLabs=mp3）
+      const audioExt = /wav/i.test(record.mimeType || record.audioBlob?.type || "")
+        ? "wav"
+        : "mp3";
+      a.download = `Siren_${record.provider}_${record.char}_Floor${record.floor}_${record.timestamp}.${audioExt}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

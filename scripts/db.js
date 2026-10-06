@@ -402,9 +402,10 @@ export async function clearTtsHistory() {
  * @param {string} text - 语音文本
  * @param {string} mood - 情绪 (新增)
  * @param {string} detail - 情绪细节 (新增)
- * @param {string|null} cacheKey - [MiMo] 可选的缓存身份。
- *   只有调用方明确传入 MiMo cacheKey 时，才要求记录中的 provider/cacheKey 完全相同
- *   （叠加原有的 floor/chatId 匹配）；不带该参数的旧调用保持原有字段匹配语义。
+ * @param {string|null} cacheKey - [MiMo/Fish] 可选的缓存身份。
+ *   只有调用方明确传入 cacheKey 时，才要求记录中的 cacheKey 完全相同
+ *   （cacheKey 字符串内已内嵌 provider 身份，跨 Provider 不可能碰撞；
+ *   叠加原有的 floor/chatId 匹配）；不带该参数的旧调用保持原有字段匹配语义。
  */
 export async function findExactTtsRecord(
   chatId,
@@ -421,8 +422,8 @@ export async function findExactTtsRecord(
       (r) =>
         String(r.floor) === String(floor) &&
         (cacheKey
-          ? // 🌟 [MiMo] 严格身份匹配：Provider + CacheKey（内含 model/voiceKey/Clone revision/文本/stylePrompt）
-            r.provider === "mimo" && r.cacheKey === cacheKey
+          ? // 🌟 [MiMo/Fish] 严格身份匹配：CacheKey（内含 provider/音色/实际发送文本）
+            r.cacheKey === cacheKey
           : r.char === char &&
             r.text === text &&
             (r.mood || "") === mood &&

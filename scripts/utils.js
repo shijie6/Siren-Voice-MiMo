@@ -235,6 +235,12 @@ export function getTtsVoiceAndMoodLists(provider) {
       const mimoVoiceMap = charExts.siren_voice_tts_mimo?.voices || {};
       voices = Object.keys(mimoVoiceMap);
       break;
+
+    case "fish":
+      // 音色：位于角色卡 siren_voice_tts_fish；Fish 无情绪参数，无固定情绪词表
+      const fishVoiceMap = charExts.siren_voice_tts_fish?.voices || {};
+      voices = Object.keys(fishVoiceMap);
+      break;
   }
 
   return { voices, moods };
@@ -284,6 +290,7 @@ export async function syncTtsWorldbookEntries(selectedProvider, isTtsEnabled) {
     elevenlabs: "ElevenLabs",
     voxcpm: "VoxCPM", // <--- 🌟 新增这一行：将 voxcpm 映射到世界书条目 TTS-VoxCPM
     mimo: "MiMo", // <--- 🌟 [MiMo] 映射到世界书条目 TTS-MiMo
+    fish: "Fish", // <--- 🌟 [Fish] 映射到世界书条目 TTS-Fish
   };
   const targetEntryName = isTtsEnabled
     ? `TTS-${providerToEntrySuffix[selectedProvider]}`
