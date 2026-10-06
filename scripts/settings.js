@@ -852,6 +852,7 @@ export const defaultSettings = Object.freeze({
     fish: {
       api_base: "",
       api_key: "",
+      tts_model: "s2.1-pro-free",
       request_timeout_ms: 60000,
     },
     voxcpm: {

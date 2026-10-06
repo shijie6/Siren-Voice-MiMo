@@ -49,6 +49,17 @@ export function getFishHtml() {
             </div>
 
             <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;">
+                <div class="siren-ext-setting-label" style="white-space: nowrap; font-size: 0.95em; color: #cbd5e1;">合成模型</div>
+                <select id="siren-fish-model" class="siren-ext-select" style="flex: 1; min-width: 200px;">
+                    <option value="s2.1-pro-free">s2.1-pro-free（免费开发者档）</option>
+                    <option value="s2.1-pro">s2.1-pro（默认付费档）</option>
+                    <option value="s2-pro">s2-pro</option>
+                    <option value="s1">s1（旧模型）</option>
+                    <option value="drama-3-preview">drama-3-preview（预览版，支持多说话人）</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;">
                 <div class="siren-ext-setting-label" style="white-space: nowrap; font-size: 0.95em; color: #cbd5e1;">API Base URL</div>
                 <input type="text" id="siren-fish-apibase" class="siren-ext-input" style="flex: 1; min-width: 200px;" placeholder="留空使用官方 https://api.fish.audio">
             </div>
@@ -294,6 +305,7 @@ function collectFishGlobalSettingsFromUi() {
   const settings = getSirenSettings();
   if (!settings.tts.fish) settings.tts.fish = {};
   settings.tts.fish.api_key = $("#siren-fish-apikey").val().trim();
+  settings.tts.fish.tts_model = $("#siren-fish-model").val() || "s2.1-pro-free";
   settings.tts.fish.api_base = $("#siren-fish-apibase").val().trim();
   return settings.tts.fish;
 }
@@ -330,6 +342,7 @@ export function bindFishEvents() {
 
   // 1. 初始化全局参数 UI
   $("#siren-fish-apikey").val(settings.tts.fish.api_key || "");
+  $("#siren-fish-model").val(settings.tts.fish.tts_model || "s2.1-pro-free");
   $("#siren-fish-apibase").val(settings.tts.fish.api_base || "");
 
   // 2. 加载角色映射

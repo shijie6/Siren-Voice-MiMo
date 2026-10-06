@@ -215,8 +215,18 @@ export async function uploadFishVoiceModel({ apiKey, title, files, apiBase = "" 
  * 官方合同：POST /v1/tts（JSON + Bearer），200 返回二进制音频流。
  * 日志只记录 status / 文本长度 / Blob 字节数；API Key 绝不写日志。
  */
-async function performFishRequest({ apiKey, text, referenceId, timeoutMs, apiBase = "" }) {
+async function performFishRequest({ apiKey, text, referenceId, timeoutMs, apiBase = "", ttsModel = "" }) {
   const endpoint = `${getFishApiBase(apiBase)}/v1/tts`;
+
+  // 🌟 model 为官方定义的 HTTP header 参数（可选值：s1/s2-pro/s2.1-pro/
+  // s2.1-pro-free/drama-3-preview）；不发送时服务端默认 s2.1-pro（付费档）。
+  const headers = {
+    "Content-Type": "application/json",
+    ...fishAuthHeaders(apiKey),
+  };
+  if (String(ttsModel || "").trim()) {
+    headers.model = String(ttsModel).trim();
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(
@@ -228,10 +238,7 @@ async function performFishRequest({ apiKey, text, referenceId, timeoutMs, apiBas
   try {
     response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...fishAuthHeaders(apiKey),
-      },
+      headers,
       body: JSON.stringify({
         text,
         reference_id: referenceId,
@@ -314,6 +321,7 @@ export async function generateFishAudioBlob(
     referenceId,
     timeoutMs: ttsSettings?.request_timeout_ms,
     apiBase: ttsSettings?.api_base,
+    ttsModel: ttsSettings?.tts_model,
   }).finally(() => {
     pendingFishRequests.delete(cacheKey);
   });
