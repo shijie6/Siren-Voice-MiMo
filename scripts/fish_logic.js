@@ -125,13 +125,18 @@ export async function fetchFishModels({
 }) {
   if (!apiKey) throw new Error("请先填写 Fish Audio API Key 并保存");
 
-  const url = new URL(`${getFishApiBase(apiBase)}/model`);
-  url.searchParams.set("page_size", String(Math.min(Math.max(pageSize, 1), 100)));
-  url.searchParams.set("page_number", String(Math.max(pageNumber, 1)));
-  if (self) url.searchParams.set("self", "true");
-  if (title) url.searchParams.set("title", title);
+  // 🌟 字符串拼接而非 new URL()：base 支持相对路径（如 SillyTavern 官方
+  // CORS 代理 "/proxy/https://api.fish.audio"），fetch 会相对当前站点解析，
+  // 手机/电脑访问地址不同也无需修改配置。
+  const params = new URLSearchParams();
+  params.set("page_size", String(Math.min(Math.max(pageSize, 1), 100)));
+  params.set("page_number", String(Math.max(pageNumber, 1)));
+  if (self) params.set("self", "true");
+  if (title) params.set("title", title);
 
-  const response = await fetch(url.toString(), {
+  const url = `${getFishApiBase(apiBase)}/model?${params.toString()}`;
+
+  const response = await fetch(url, {
     method: "GET",
     headers: fishAuthHeaders(apiKey),
   });

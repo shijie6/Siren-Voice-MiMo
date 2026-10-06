@@ -56,7 +56,8 @@ export function getFishHtml() {
                 <i class="fa-solid fa-circle-info"></i>
                 Fish Audio 为按量计费的云端服务；音色为服务端持久 reference_id（官方公开音色库或自己账号的模型）。<br>
                 <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i>
-                官方 API 不开放浏览器跨域(CORS)，直连会被拦截。留空 Base URL 仅在代理/扩展环境可用；普通浏览器环境请填入自建反向代理地址（转发至 api.fish.audio，需支持 /v1/tts 与 /model 路径透传）。
+                官方 API 不开放浏览器跨域(CORS)，直连会被拦截。推荐填入酒馆自带的 CORS 代理：
+                <b>/proxy/https://api.fish.audio</b>（相对路径，需在服务端启用 CORS 代理；手机/电脑访问地址不同也无需修改）。也可填自建反向代理的完整地址。
             </small>
         </div>
 
