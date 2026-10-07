@@ -109,9 +109,17 @@ export function getFishHtml() {
         <div style="background: rgba(0,0,0,0.2); border: 1px solid #334155; border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
             <div style="color: #f59e0b; font-size: 0.8em;">
                 <i class="fa-solid fa-triangle-exclamation"></i>
-                参考音频将上传到 Fish Audio 服务器创建私有音色模型（默认 private，仅自己可见）。请只上传自己拥有授权的声音样本。
+                参考音频将上传到 Fish Audio 服务器创建音色模型。请只上传自己拥有授权的声音样本。<br>
+                <i class="fa-solid fa-circle-info"></i>
+                免费账号仅能创建「公开」音色（社区可见）；「非公开」凭链接可见；「私有」仅自己可见（需付费账号）。公开音色如要求封面图导致上传失败，请到 fish.audio 网站补传或改用网站流程。
             </div>
             <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="color:#cbd5e1; font-size:0.9em;">音色可见性</label>
+                <select id="siren-fish-clone-visibility" class="siren-ext-select" style="width: 100%;">
+                    <option value="public">公开（public，免费账号可用）</option>
+                    <option value="unlist">非公开（unlist，凭链接访问）</option>
+                    <option value="private">私有（private，仅自己可见）</option>
+                </select>
                 <input type="text" id="siren-fish-clone-title" class="siren-ext-input" placeholder="克隆音色名称（如：我的女声）">
                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                     <input type="file" id="siren-fish-clone-files" accept="audio/*" multiple style="display: none;">
@@ -471,6 +479,7 @@ export function bindFishEvents() {
           title,
           files: pendingCloneFiles,
           apiBase: $("#siren-fish-apibase").val().trim(),
+          visibility: $("#siren-fish-clone-visibility").val() || "public",
         });
 
         $("#siren-fish-clone-title").val("");

@@ -165,19 +165,32 @@ export async function fetchFishModels({
   return { items, hasMore: !!result?.has_more };
 }
 
+/** 克隆模型可见性官方枚举（免费账号仅能创建 public） */
+export const FISH_MODEL_VISIBILITY = Object.freeze(["public", "unlist", "private"]);
+
 /**
  * 上传参考音频创建克隆模型（官方 POST /model，multipart，fast 模式即时可用）。
- * 默认 private 可见性。成功返回 { id }（服务端持久 reference_id）。
+ * visibility：public（公开，免费账号唯一可用档）/ unlist（非公开，凭链接访问）/ private（私有）。
+ * 成功返回 { id }（服务端持久 reference_id）。
  */
-export async function uploadFishVoiceModel({ apiKey, title, files, apiBase = "" }) {
+export async function uploadFishVoiceModel({
+  apiKey,
+  title,
+  files,
+  apiBase = "",
+  visibility = "public",
+}) {
   if (!apiKey) throw new Error("请先填写 Fish Audio API Key 并保存");
   if (!String(title || "").trim()) throw new Error("请填写克隆音色名称");
   if (!files || files.length === 0) throw new Error("请选择参考音频文件");
+  if (!FISH_MODEL_VISIBILITY.includes(visibility)) {
+    throw new Error("音色可见性仅支持：公开(public)、非公开(unlist)、私有(private)");
+  }
 
   const formData = new FormData();
   formData.append("type", "tts");
   formData.append("train_mode", "fast");
-  formData.append("visibility", "private");
+  formData.append("visibility", visibility);
   formData.append("title", title.trim());
   for (const file of files) {
     formData.append("voices", file, file.name || "voice.wav");
