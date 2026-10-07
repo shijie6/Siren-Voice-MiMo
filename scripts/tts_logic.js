@@ -21,6 +21,13 @@ import {
   generateFishAudioBlob,
 } from "./fish_logic.js";
 import {
+  getBreezeCharacterConfig,
+  getBreezeCacheKeyForSpeak,
+  buildBreezeInstruction,
+  buildBreezeCacheKey,
+  generateBreezeAudioBlob,
+} from "./breeze_logic.js";
+import {
   parseSpeakTags,
   stripParentheticalAsides,
   checkReplyIntegrity,
@@ -285,16 +292,22 @@ export async function fetchTtsBlobProvider(
 
     // 1. 查找缓存时，必须使用带有语气词和Markdown的原始 speakObj.text，保证 Cache Hit
     if (!forceRegen && currentChatId) {
-      if (provider === "mimo" || provider === "fish") {
-        // 🌟 [MiMo/Fish] 缓存身份必须区分 Provider/音色/实际发送文本，
+      if (
+        provider === "mimo" ||
+        provider === "fish" ||
+        provider === "breeze"
+      ) {
+        // 🌟 [MiMo/Fish/Breeze] 缓存身份必须区分 Provider/音色/实际发送文本，
         // 不能走旧的 char/text/mood/detail 文本匹配（会串音）。
         // 身份解析失败（缺映射等）时 key 为 null，视为未命中，
         // 转入生成路径给出明确的用户提示。
         let providerKey = null;
         if (provider === "mimo") {
           providerKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
-        } else {
+        } else if (provider === "fish") {
           providerKey = await getFishCacheKeyForSpeak(speakObj);
+        } else {
+          providerKey = await getBreezeCacheKeyForSpeak(speakObj, ttsSettings);
         }
         if (providerKey) {
           const cachedRecord = await findExactTtsRecord(
@@ -521,6 +534,50 @@ export async function fetchTtsBlobProvider(
         break;
       }
 
+      case "breeze": {
+        // 🌟 [Breeze] 本地模型（breeze_infer.api）。无旁白兜底，未配置一律明确提示。
+        // 正文保留 ()/[] 稿内标签（官方特性，与公共清洗区前两步一致）；
+        // mood/detail 合并进 instruction（导演指令），不进入朗读正文。
+        let resolvedBreezeVoice = null;
+        try {
+          resolvedBreezeVoice = await getBreezeCharacterConfig(speakObj.char);
+        } catch (err) {
+          if (window.toastr)
+            window.toastr.warning(err?.message || "Breeze 音色解析失败");
+          return null;
+        }
+        if (!resolvedBreezeVoice) {
+          if (window.toastr)
+            window.toastr.warning(`未配置“${speakObj.char}”的 Breeze 音色。`);
+          return null;
+        }
+        const breezeInstruction = buildBreezeInstruction(
+          speakObj,
+          resolvedBreezeVoice,
+        );
+        providerCacheKey = await buildBreezeCacheKey({
+          speakObj,
+          resolvedVoice: resolvedBreezeVoice,
+          apiPayloadText,
+          instruction: breezeInstruction,
+          cfgScale: ttsSettings?.cfg_scale,
+          seed: ttsSettings?.seed,
+        });
+        try {
+          blob = await generateBreezeAudioBlob(
+            { ...speakObj, text: apiPayloadText },
+            resolvedBreezeVoice,
+            ttsSettings,
+          );
+        } catch (err) {
+          console.error(`[Siren Voice][Breeze] 合成失败:`, err);
+          if (window.toastr)
+            window.toastr.warning(err?.message || "Breeze TTS 合成失败");
+          return null;
+        }
+        break;
+      }
+
       default:
         console.warn(`[Siren Voice][预加载] 暂不支持该引擎: ${provider}`);
         return null;
@@ -590,8 +647,9 @@ export async function preloadTtsForTimeline(
       case "elevenlabs":
       case "mimo":
       case "fish":
+      case "breeze":
         // 🌟 内存优化：串行生成，逐条请求并立即释放，避免多段大体积音频同时驻留内存触发手机 OOM。
-        // [MiMo/Fish] 进入场景时间轴时继续复用本函数与现有串行生成策略，不另建预加载器。
+        // [MiMo/Fish/Breeze] 进入场景时间轴时继续复用本函数与现有串行生成策略，不另建预加载器。
         for (let i = 0; i < timeline.length; i++) {
           const node = timeline[i];
           if (node.type === "tts") {

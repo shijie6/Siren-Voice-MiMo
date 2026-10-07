@@ -855,6 +855,12 @@ export const defaultSettings = Object.freeze({
       tts_model: "s2.1-pro-free",
       request_timeout_ms: 60000,
     },
+    breeze: {
+      api_base: "http://127.0.0.1:7860",
+      cfg_scale: 4,
+      seed: "",
+      request_timeout_ms: 180000,
+    },
     voxcpm: {
       api_base: "http://127.0.0.1:8000",
       api_key: "",

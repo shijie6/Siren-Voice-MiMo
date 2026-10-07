@@ -6,6 +6,7 @@ import { getGptSovitsHtml, bindGptSovitsEvents } from "./gpt-sovits.js";
 import { getVoxCpmHtml, bindVoxCpmEvents } from "./voxcpm.js";
 import { getMimoHtml, bindMimoEvents } from "./mimo.js";
 import { getFishHtml, bindFishEvents } from "./fish.js";
+import { getBreezeHtml, bindBreezeEvents } from "./breeze.js";
 import { getSirenSettings, saveSirenSettings } from "./settings.js";
 import { compileSirenCss, syncTtsWorldbookEntries } from "./utils.js";
 import {
@@ -170,6 +171,7 @@ export function initTtsSettings() {
                     </div>
                     <select id="siren-tts-provider" class="siren-ext-select" style="max-width: 200px; border-color: #0ea5e9 !important; box-shadow: 0 0 10px rgba(14, 165, 233, 0.5) !important; outline: none; background-color: rgba(15, 23, 42, 0.8);">
                         <option value="indextts">Index-TTS 2</option>
+                        <option value="breeze">Breeze TTS 2</option>
                         <option value="gptsovits">GPT-SoVITS</option>
                         <option value="voxcpm">VoxCPM 2</option>
                         <option value="doubao">豆包（火山引擎）</option>
@@ -623,6 +625,8 @@ function bindTtsGlobalUiEvents() {
           $("#siren-mimo-save-all").trigger("click", [true]);
         } else if (currentProvider === "fish") {
           $("#siren-fish-save-all").trigger("click", [true]);
+        } else if (currentProvider === "breeze") {
+          $("#siren-breeze-save-all").trigger("click", [true]);
         }
         await updateTtsGlobalMacros(currentProvider);
 
@@ -673,6 +677,9 @@ function renderProviderSettings() {
   } else if (provider === "fish") {
     container.html(getFishHtml());
     bindFishEvents();
+  } else if (provider === "breeze") {
+    container.html(getBreezeHtml());
+    bindBreezeEvents();
   } else {
     container.html(
       `<div style="text-align:center; padding: 20px; color:#64748b;">${provider} 设置界面构建中... 🚧</div>`,
@@ -743,6 +750,11 @@ export async function updateTtsGlobalMacros(provider) {
     } else if (provider === "fish") {
       // Fish 无情绪参数，currentMood 为空
       const voices = charExt.siren_voice_tts_fish?.voices || {};
+      currentVoice = Object.keys(voices).join(", ");
+      currentMood = "";
+    } else if (provider === "breeze") {
+      // Breeze 情绪走导演指令（instruction），currentMood 为空
+      const voices = charExt.siren_voice_breeze?.voices || {};
       currentVoice = Object.keys(voices).join(", ");
       currentMood = "";
     }

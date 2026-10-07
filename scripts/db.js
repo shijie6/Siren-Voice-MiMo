@@ -3,9 +3,10 @@ import { getSirenSettings } from "./settings.js";
 
 const DB_NAME = "SirenVoiceDB";
 const STORE_NAME = "TTS_History";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const AMBIENCE_STORE_NAME = "AMBIENCE_Cache"; // 👈 [新增] Ambience 专属存储库名
 const MIMO_CLONE_STORE_NAME = "MIMO_Clone_Assets"; // 👈 [新增] MiMo VoiceClone 本机参考音频资产
+const BREEZE_REF_STORE_NAME = "BREEZE_Ref_Assets"; // 👈 [Breeze] 本机参考音频资产（结构与 MiMo 资产同构）
 
 /** @type {Map<string, Object[]>} cache of getTtsHistory results keyed by chatId */
 const ttsHistoryCache = new Map();
@@ -114,6 +115,11 @@ function openDB() {
       // 只在 Store 不存在时创建；不删除已有 Store，不清空旧语音历史。
       if (!db.objectStoreNames.contains(MIMO_CLONE_STORE_NAME)) {
         db.createObjectStore(MIMO_CLONE_STORE_NAME, { keyPath: "id" });
+      }
+
+      // 👇 [Breeze] 参考音频资产库（结构与 MiMo 资产同构），同样只在不存在时创建。
+      if (!db.objectStoreNames.contains(BREEZE_REF_STORE_NAME)) {
+        db.createObjectStore(BREEZE_REF_STORE_NAME, { keyPath: "id" });
       }
 
       const ttsStore = event.target.transaction.objectStore(STORE_NAME);
@@ -605,6 +611,80 @@ export async function deleteMimoCloneAsset(id) {
     return true;
   } catch (err) {
     console.error("[Siren Voice] 💾 删除 MiMo Clone 资产失败:", err);
+    return false;
+  }
+}
+
+/**
+ * 👇 [Breeze] 本机参考音频资产 CRUD（结构同 MiMo 资产，与 TTS 历史数据职责分离）
+ * 资产结构: { id, name, mimeType, dataUrl, byteLength, createdAt, updatedAt, revision }
+ */
+
+/** 保存（新增或整体替换）一条 Breeze 参考音频资产 */
+export async function saveBreezeRefAsset(asset) {
+  if (!asset || !asset.id) {
+    throw new Error("Breeze 参考音频资产缺少 id，无法保存");
+  }
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction(BREEZE_REF_STORE_NAME, "readwrite");
+    const request = transaction.objectStore(BREEZE_REF_STORE_NAME).put(asset);
+    request.onsuccess = () => resolve();
+    request.onerror = (e) => reject(e.target.error);
+  });
+  return asset;
+}
+
+/** 按 id 读取一条 Breeze 参考音频资产，不存在时返回 null */
+export async function getBreezeRefAsset(id) {
+  if (!id) return null;
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction(BREEZE_REF_STORE_NAME, "readonly");
+      const request = transaction.objectStore(BREEZE_REF_STORE_NAME).get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.error("[Siren Voice] 💾 读取 Breeze 参考音频资产失败:", err);
+    return null;
+  }
+}
+
+/** 列出全部 Breeze 参考音频资产（按更新时间倒序） */
+export async function listBreezeRefAssets() {
+  try {
+    const db = await openDB();
+    const records = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(BREEZE_REF_STORE_NAME, "readonly");
+      const request = transaction.objectStore(BREEZE_REF_STORE_NAME).getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = (e) => reject(e.target.error);
+    });
+    return records.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  } catch (err) {
+    console.error("[Siren Voice] 💾 列出 Breeze 参考音频资产失败:", err);
+    return [];
+  }
+}
+
+/** 删除一条 Breeze 参考音频资产，返回是否删除成功 */
+export async function deleteBreezeRefAsset(id) {
+  if (!id) return false;
+  try {
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(BREEZE_REF_STORE_NAME, "readwrite");
+      const request = transaction
+        .objectStore(BREEZE_REF_STORE_NAME)
+        .delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = (e) => reject(e.target.error);
+    });
+    return true;
+  } catch (err) {
+    console.error("[Siren Voice] 💾 删除 Breeze 参考音频资产失败:", err);
     return false;
   }
 }

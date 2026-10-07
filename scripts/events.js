@@ -18,6 +18,7 @@ import {
 } from "./tts_logic.js";
 import { getMimoCacheKeyForSpeak } from "./mimo_logic.js";
 import { getFishCacheKeyForSpeak } from "./fish_logic.js";
+import { getBreezeCacheKeyForSpeak } from "./breeze_logic.js";
 import { findExactTtsRecord, clearTtsCache } from "./db.js";
 import {
   injectScenePlayButtons,
@@ -1469,14 +1470,16 @@ async function handleInlineSpeakPlay(speakObj, cardElement, action = "play") {
 
   try {
     if (action === "play") {
-      // 🌟 [MiMo/Fish] 单条播放路径与 tts_logic 生成链路共用同一个缓存身份 helper：
-      // 只有带缓存身份的 Provider（MiMo/Fish）才计算 cacheKey（key 为 null 表示身份解析失败，按未命中处理）；
+      // 🌟 [MiMo/Fish/Breeze] 单条播放路径与 tts_logic 生成链路共用同一个缓存身份 helper：
+      // 只有带缓存身份的 Provider 才计算 cacheKey（key 为 null 表示身份解析失败，按未命中处理）；
       // 其他 Provider 传入 null，继续沿用原有的 char/text/mood/detail 匹配语义。
       let providerCacheKey = null;
       if (provider === "mimo") {
         providerCacheKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
       } else if (provider === "fish") {
         providerCacheKey = await getFishCacheKeyForSpeak(speakObj);
+      } else if (provider === "breeze") {
+        providerCacheKey = await getBreezeCacheKeyForSpeak(speakObj, ttsSettings);
       }
       const cachedRecord = await findExactTtsRecord(
         currentChatId,

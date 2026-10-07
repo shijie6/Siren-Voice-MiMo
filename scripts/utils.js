@@ -241,6 +241,12 @@ export function getTtsVoiceAndMoodLists(provider) {
       const fishVoiceMap = charExts.siren_voice_tts_fish?.voices || {};
       voices = Object.keys(fishVoiceMap);
       break;
+
+    case "breeze":
+      // 音色：位于角色卡 siren_voice_breeze；Breeze 情绪走导演指令，无固定情绪词表
+      const breezeVoiceMap = charExts.siren_voice_breeze?.voices || {};
+      voices = Object.keys(breezeVoiceMap);
+      break;
   }
 
   return { voices, moods };
@@ -291,6 +297,7 @@ export async function syncTtsWorldbookEntries(selectedProvider, isTtsEnabled) {
     voxcpm: "VoxCPM", // <--- 🌟 新增这一行：将 voxcpm 映射到世界书条目 TTS-VoxCPM
     mimo: "MiMo", // <--- 🌟 [MiMo] 映射到世界书条目 TTS-MiMo
     fish: "Fish", // <--- 🌟 [Fish] 映射到世界书条目 TTS-Fish
+    breeze: "Breeze", // <--- 🌟 [Breeze] 映射到世界书条目 TTS-Breeze
   };
   const targetEntryName = isTtsEnabled
     ? `TTS-${providerToEntrySuffix[selectedProvider]}`
