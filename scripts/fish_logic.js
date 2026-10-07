@@ -28,14 +28,17 @@ export function getFishApiBase(customBase) {
 const pendingFishRequests = new Map();
 
 /**
- * Fish 请求正文派生：与 indextts/doubao/gptsovits 同组清洗，并额外剥离圆括号。
- * Fish 没有 MiMo 的 () / [] 音频标签机制，任何括号标签都会被当文字朗读，
- * 因此 [] 【】 由 stripParentheticalAsides 剥离后，() （） 也在本函数内剥除。
+ * Fish 请求正文派生：
+ * 🌟 dub 属性优先（跨语种配音：标签内中文供显示，dub 译文供发送），无 dub 回退原文。
+ * 🌟 官方 S2 支持 [angry]/[laughing] 等英文方括号内联标签（情绪/音效两类），
+ * 因此保留 []；() （） 【】 不是官方标签、会被朗读成文字，一律剥离防呆。
+ * Markdown 仅做最小清理。
  */
 export function buildFishApiPayloadText(speakObj) {
-  return stripParentheticalAsides(
-    stripWrappingPunctuation(stripInlineMarkdown(String(speakObj?.text ?? ""))),
-  )
+  const source =
+    String(speakObj?.attrs?.dub || "").trim() || String(speakObj?.text ?? "");
+  return stripWrappingPunctuation(stripInlineMarkdown(source))
+    .replace(/【[^【】]*】/g, "")
     .replace(/（[^（）]*）/g, "")
     .replace(/\([^()]*\)/g, "")
     .replace(/[ \t]+/g, " ")

@@ -130,6 +130,59 @@ function getDoubaoCharConfig(charName, ttsSettings) {
 }
 
 /**
+ * 🌟 [ElevenLabs] 实际发送文本：dub 属性优先（跨语种配音，显示中文、发送译文），
+ * 无 dub 回退 apiPayloadText；[] 转为 ElevenLabs 的 () 风格标签。
+ */
+export function getElevenLabsSendText(speakObj, apiPayloadText) {
+  const source =
+    String(speakObj?.attrs?.dub || "").trim() || apiPayloadText;
+  return source
+    .replace(/\[([^\]]+)\]/g, "($1)")
+    .replace(/ã€([^ã€‘]+)ã€‘/g, "($1)");
+}
+
+/**
+ * 🌟 [ElevenLabs] 缓存身份：provider + voice_id + model + 实际发送文本（含 dub）
+ * + mood/detail。dub 变化（换配音语言）必须换缓存，否则会播错语言。
+ * 静默解析（无映射返回 null），弹窗提示交给生成路径。
+ */
+export async function getElevenLabsCacheKeyForSpeak(speakObj, ttsSettings) {
+  try {
+    const context = SillyTavern.getContext();
+    const voices =
+      context?.characters?.[context?.characterId]?.data?.extensions
+        ?.siren_voice_tts_elevenlabs?.voices || {};
+    const wanted = String(speakObj?.char || "").trim().toLowerCase();
+    const matchKey = Object.keys(voices).find(
+      (k) => k.toLowerCase() === wanted,
+    );
+    const voiceCfg = matchKey ? voices[matchKey] : null;
+    if (!voiceCfg?.voice_id) return null;
+
+    const apiPayloadText = stripWrappingPunctuation(
+      stripInlineMarkdown(String(speakObj?.text ?? "")),
+    ).trim();
+    const text = getElevenLabsSendText(speakObj, apiPayloadText);
+    if (!text.trim()) return null;
+
+    return JSON.stringify({
+      provider: "elevenlabs",
+      voice: voiceCfg.voice_id,
+      model: voiceCfg.model || ttsSettings?.model || "eleven_multilingual_v2",
+      text,
+      mood: String(speakObj?.mood || ""),
+      detail: String(speakObj?.detail || ""),
+    });
+  } catch (err) {
+    console.warn(
+      "[Siren Voice][ElevenLabs] 缓存身份解析失败，按未缓存处理:",
+      err?.message,
+    );
+    return null;
+  }
+}
+
+/**
  * 统一的 TTS 路由分发器 (用于单个语音条的点击/重生成)
  */
 export async function dispatchTtsGeneration(
@@ -437,9 +490,12 @@ export async function fetchTtsBlobProvider(
         );
         if (!preloadElConfig) return null;
 
-        const preloadElText = apiPayloadText
-          .replace(/\[([^\]]+)\]/g, "($1)")
-          .replace(/ã€([^ã€‘]+)ã€‘/g, "($1)");
+        // 🌟 dub 优先（跨语种配音）+ cacheKey 隔离（dub 换语言不得命中旧音频）
+        providerCacheKey = await getElevenLabsCacheKeyForSpeak(
+          speakObj,
+          ttsSettings,
+        );
+        const preloadElText = getElevenLabsSendText(speakObj, apiPayloadText);
 
         blob = await generateElevenLabsAudioBlob(
           preloadElText,

@@ -20,6 +20,7 @@ import { getMimoCacheKeyForSpeak } from "./mimo_logic.js";
 import { getFishCacheKeyForSpeak } from "./fish_logic.js";
 import { getBreezeCacheKeyForSpeak } from "./breeze_logic.js";
 import { getIndexTts25CacheKeyForSpeak } from "./indextts25_logic.js";
+import { getElevenLabsCacheKeyForSpeak } from "./tts_logic.js";
 import { findExactTtsRecord, clearTtsCache } from "./db.js";
 import {
   injectScenePlayButtons,
@@ -1483,6 +1484,8 @@ async function handleInlineSpeakPlay(speakObj, cardElement, action = "play") {
         providerCacheKey = await getBreezeCacheKeyForSpeak(speakObj, ttsSettings);
       } else if (provider === "indextts25") {
         providerCacheKey = await getIndexTts25CacheKeyForSpeak(speakObj, ttsSettings);
+      } else if (provider === "elevenlabs") {
+        providerCacheKey = await getElevenLabsCacheKeyForSpeak(speakObj, ttsSettings);
       }
       const cachedRecord = await findExactTtsRecord(
         currentChatId,
