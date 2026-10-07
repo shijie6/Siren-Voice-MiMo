@@ -824,6 +824,26 @@ export const defaultSettings = Object.freeze({
       // 如果 mood 命中预设，detail 是否继续附加到 emo_text 中
       append_detail_to_emo_text: false,
     },
+    // IndexTTS 2.5：与 2.0 同款 API 合同（速度快），情绪预设与 2.0 共用
+    indextts25: {
+      api_base: "http://127.0.0.1:7880",
+      api_key: "",
+      clean_text: true,
+      emo_weight: 0.65,
+      emo_random: false,
+      do_sample: true,
+      max_text_tokens_per_segment: 120,
+      top_p: 0.8,
+      top_k: 30,
+      temperature: 0.8,
+      length_penalty: 0.0,
+      num_beams: 3,
+      repetition_penalty: 10.0,
+      max_mel_tokens: 1500,
+      allow_detail_as_emo_text: true,
+      append_detail_to_emo_text: false,
+      lang: "", // 空为自动（不发送 lang 字段）；2.5 支持中/英/日/西/阿
+    },
     doubao: {
       app_id: "",
       access_key: "",

@@ -204,6 +204,16 @@ export function getTtsVoiceAndMoodLists(provider) {
       );
       break;
 
+    case "indextts25":
+      // 音色：位于角色卡 siren_voice_tts_v25；情绪预设与 2.0 共用
+      const idx25VoiceMap = charExts.siren_voice_tts_v25?.voices || {};
+      voices = Object.keys(idx25VoiceMap);
+      const settings25 = getSirenSettings();
+      moods = (settings25.tts?.indextts?.emotion_presets || []).map(
+        (e) => e.name,
+      );
+      break;
+
     case "minimax":
       // 音色：位于角色卡 siren_voice_tts_minimax
       const mmVoiceMap = charExts.siren_voice_tts_minimax?.voices || {};
@@ -298,6 +308,7 @@ export async function syncTtsWorldbookEntries(selectedProvider, isTtsEnabled) {
     mimo: "MiMo", // <--- 🌟 [MiMo] 映射到世界书条目 TTS-MiMo
     fish: "Fish", // <--- 🌟 [Fish] 映射到世界书条目 TTS-Fish
     breeze: "Breeze", // <--- 🌟 [Breeze] 映射到世界书条目 TTS-Breeze
+    indextts25: "IndexTTS25", // <--- 🌟 [IdxTTS2.5] 映射到世界书条目 TTS-IndexTTS25
   };
   const targetEntryName = isTtsEnabled
     ? `TTS-${providerToEntrySuffix[selectedProvider]}`

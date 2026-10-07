@@ -14,6 +14,7 @@ import {
 import { getMimoCacheKeyForSpeak } from "./mimo_logic.js";
 import { getFishCacheKeyForSpeak } from "./fish_logic.js";
 import { getBreezeCacheKeyForSpeak } from "./breeze_logic.js";
+import { getIndexTts25CacheKeyForSpeak } from "./indextts25_logic.js";
 
 /**
  * 🌟 [MiMo/Fish/Breeze] 场景链路统一查库入口（按钮状态扫描与播放前回读共用）：
@@ -40,6 +41,12 @@ async function findTtsRecordWithProviderIdentity(chatId, floorId, speakObj) {
     cacheKey = await getBreezeCacheKeyForSpeak(
       speakObj,
       settings?.tts?.breeze || {},
+    );
+    if (!cacheKey) return null;
+  } else if (provider === "indextts25") {
+    cacheKey = await getIndexTts25CacheKeyForSpeak(
+      speakObj,
+      settings?.tts?.indextts25 || {},
     );
     if (!cacheKey) return null;
   }

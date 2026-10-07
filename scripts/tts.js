@@ -1,4 +1,5 @@
 import { getIndexTtsHtml, bindIndexTtsEvents } from "./indextts.js";
+import { getIndexTts25Html, bindIndexTts25Events } from "./indextts25.js";
 import { getMinimaxHtml, bindMinimaxEvents } from "./minimax.js";
 import { getElevenLabsHtml, bindElevenLabsEvents } from "./elevenlabs.js";
 import { getDoubaoHtml, bindDoubaoEvents } from "./doubao.js";
@@ -171,6 +172,7 @@ export function initTtsSettings() {
                     </div>
                     <select id="siren-tts-provider" class="siren-ext-select" style="max-width: 200px; border-color: #0ea5e9 !important; box-shadow: 0 0 10px rgba(14, 165, 233, 0.5) !important; outline: none; background-color: rgba(15, 23, 42, 0.8);">
                         <option value="indextts">Index-TTS 2</option>
+                        <option value="indextts25">Index TTS 2.5</option>
                         <option value="breeze">Breeze TTS 2</option>
                         <option value="gptsovits">GPT-SoVITS</option>
                         <option value="voxcpm">VoxCPM 2</option>
@@ -611,6 +613,8 @@ function bindTtsGlobalUiEvents() {
         // 5. 核心逻辑：触发当前所选 Provider 的专属保存按钮！
         if (currentProvider === "indextts") {
           $("#siren-idx-global-save").trigger("click", [true]);
+        } else if (currentProvider === "indextts25") {
+          $("#siren-idx25-save-all").trigger("click", [true]);
         } else if (currentProvider === "minimax") {
           $("#siren-mm-save-all").trigger("click", [true]);
         } else if (currentProvider === "elevenlabs") {
@@ -656,6 +660,9 @@ function renderProviderSettings() {
   if (provider === "indextts") {
     container.html(getIndexTtsHtml());
     bindIndexTtsEvents();
+  } else if (provider === "indextts25") {
+    container.html(getIndexTts25Html());
+    bindIndexTts25Events();
   } else if (provider === "minimax") {
     container.html(getMinimaxHtml());
     bindMinimaxEvents();
@@ -715,6 +722,16 @@ export async function updateTtsGlobalMacros(provider) {
 
       const presets = settings?.tts?.indextts?.emotion_presets || [];
       currentMood = presets
+        .map((p) => p.name)
+        .filter(Boolean)
+        .join(", ");
+    } else if (provider === "indextts25") {
+      // 2.5：音色用独立键，情绪预设与 2.0 共用
+      const voices25 = charExt.siren_voice_tts_v25?.voices || {};
+      currentVoice = Object.keys(voices25).join(", ");
+
+      const presets25 = settings?.tts?.indextts?.emotion_presets || [];
+      currentMood = presets25
         .map((p) => p.name)
         .filter(Boolean)
         .join(", ");

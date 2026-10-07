@@ -1,4 +1,8 @@
 import { requestIndexTtsGeneration } from "./indextts_logic.js";
+import {
+  getIndexTts25CacheKeyForSpeak,
+  requestIndexTts25Generation,
+} from "./indextts25_logic.js";
 import { generateMinimaxAudioBlob } from "./minimax_logic.js";
 import { generateElevenLabsAudioBlob } from "./elevenlabs_logic.js";
 import { generateDoubaoProductionAudioBlob } from "./doubao_logic.js";
@@ -295,9 +299,10 @@ export async function fetchTtsBlobProvider(
       if (
         provider === "mimo" ||
         provider === "fish" ||
-        provider === "breeze"
+        provider === "breeze" ||
+        provider === "indextts25"
       ) {
-        // 🌟 [MiMo/Fish/Breeze] 缓存身份必须区分 Provider/音色/实际发送文本，
+        // 🌟 [MiMo/Fish/Breeze/IdxTTS2.5] 缓存身份必须区分 Provider/音色/实际发送文本，
         // 不能走旧的 char/text/mood/detail 文本匹配（会串音）。
         // 身份解析失败（缺映射等）时 key 为 null，视为未命中，
         // 转入生成路径给出明确的用户提示。
@@ -306,8 +311,13 @@ export async function fetchTtsBlobProvider(
           providerKey = await getMimoCacheKeyForSpeak(speakObj, ttsSettings);
         } else if (provider === "fish") {
           providerKey = await getFishCacheKeyForSpeak(speakObj);
-        } else {
+        } else if (provider === "breeze") {
           providerKey = await getBreezeCacheKeyForSpeak(speakObj, ttsSettings);
+        } else {
+          providerKey = await getIndexTts25CacheKeyForSpeak(
+            speakObj,
+            ttsSettings,
+          );
         }
         if (providerKey) {
           const cachedRecord = await findExactTtsRecord(
@@ -350,6 +360,7 @@ export async function fetchTtsBlobProvider(
     // 第二步：剔除中英文方括号语气词（仅限不支持的三个引擎）
     if (
       provider === "indextts" ||
+      provider === "indextts25" ||
       provider === "doubao" ||
       provider === "gptsovits"
     ) {
@@ -377,6 +388,27 @@ export async function fetchTtsBlobProvider(
           ttsSettings,
         );
         break;
+
+      case "indextts25": {
+        // 🌟 [IdxTTS2.5] 与 2.0 同款 API 合同（速度快），走 cacheKey 隔离
+        // （历史表里 2.0/2.5 记录靠旧匹配会互相命中）。
+        providerCacheKey = await getIndexTts25CacheKeyForSpeak(
+          speakObj,
+          ttsSettings,
+        );
+        try {
+          blob = await requestIndexTts25Generation(
+            { ...speakObj, text: apiPayloadText },
+            ttsSettings,
+          );
+        } catch (err) {
+          console.error(`[Siren Voice][IndexTTS2.5] 合成失败:`, err);
+          if (window.toastr)
+            window.toastr.warning(err?.message || "IndexTTS 2.5 合成失败");
+          return null;
+        }
+        break;
+      }
 
       case "minimax":
         const preloadMmConfig = getMinimaxCharConfig(
@@ -625,6 +657,7 @@ export async function preloadTtsForTimeline(
   try {
     switch (provider) {
       case "indextts":
+      case "indextts25":
       case "doubao":
       case "gptsovits":
       case "voxcpm":
